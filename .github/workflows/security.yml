@@ -1,0 +1,65 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - run: uv sync
+      - run: uv export --no-emit-workspace --format requirements-txt --no-hashes -o requirements.audit.txt
+      - run: uv run --with pip-audit pip-audit --requirement requirements.audit.txt --desc
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - working-directory: apps/web
+        run: npm ci
+      - working-directory: apps/web
+        run: npm audit --audit-level=high
+
+  policy:
+    name: Project invariants
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.12
+      - run: uv sync
+      - run: uv run pytest tests/architecture tests/unit/test_configuration.py tests/unit/test_observability.py -q
+      - name: Fail on tracked .env
+        run: |
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked in git"
+            exit 1
+          fi

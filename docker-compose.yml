@@ -1,0 +1,65 @@
+services:
+  couchbase:
+    image: couchbase/server:7.6.5
+    ports:
+      - "8091-8096:8091-8096"
+      - "11210:11210"
+    volumes:
+      - couchbase-data:/opt/couchbase/var
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8091/ui/index.html >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  agent-gateway:
+    build:
+      context: .
+      dockerfile: apps/agent-gateway/Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      LLM_PROVIDER: ${LLM_PROVIDER:-echo}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AGENT_GATEWAY_HOST: 0.0.0.0
+      AGENT_GATEWAY_PORT: 8100
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      agent-gateway:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      AGENT_GATEWAY_URL: http://agent-gateway:8100
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-echo}
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+
+volumes:
+  couchbase-data:

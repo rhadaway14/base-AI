@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_ENV: test
+  LLM_PROVIDER: echo
+
+jobs:
+  python:
+    name: Python ${{ matrix.python }} — quality
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+      - run: uv python install ${{ matrix.python }}
+      - run: uv sync --python ${{ matrix.python }}
+      - run: uv run ruff check --output-format=github .
+      - run: uv run ruff format --check .
+      - run: uv run mypy packages scripts apps/api/src apps/agent-gateway/src
+      - run: uv run mypy --platform linux packages scripts apps/api/src apps/agent-gateway/src
+      - run: uv run pytest -m "not integration and not e2e" --cov --cov-report=term-missing
+      - run: uv run python scripts/check_project.py
+
+  web:
+    name: Web — lint, types, build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+
+  terraform:
+    name: Terraform — validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.3
+      - run: terraform fmt -check -recursive infrastructure/terraform
+      - working-directory: infrastructure/terraform/environments/dev
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate

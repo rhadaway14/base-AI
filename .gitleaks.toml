@@ -1,0 +1,4 @@
+title = "Architected AI Starter gitleaks configuration"
+
+[extend]
+useDefault = true

@@ -1,0 +1,7 @@
+:root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color-scheme: dark; }
+body { margin: 0; background: #0b1020; color: #eef2ff; }
+main { max-width: 800px; margin: 12vh auto; padding: 2rem; }
+h1 { font-size: clamp(2.4rem, 7vw, 5rem); line-height: 0.95; margin: 0.25rem 0 1.5rem; }
+p { color: #c7d2fe; line-height: 1.7; }
+.eyebrow { text-transform: uppercase; letter-spacing: .18em; font-size: .8rem; }
+pre { margin-top: 2rem; padding: 1.25rem; background: #151b31; border-radius: .75rem; overflow: auto; }

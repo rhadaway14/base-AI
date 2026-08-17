@@ -1,0 +1,21 @@
+[project]
+name = "app-api"
+version = "0.1.0"
+description = "Public API"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "app-domain-models",
+    "app-observability",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app_api"]
